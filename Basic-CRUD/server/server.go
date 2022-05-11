@@ -6,6 +6,9 @@ import (
 	"fmt"
 	"io/ioutil"
 	"net/http"
+	"strconv"
+
+	"github.com/gorilla/mux"
 )
 
 // Insert a User into the database
@@ -101,6 +104,55 @@ func GetUsers(w http.ResponseWriter, r *http.Request) {
 
 // Get one user from database
 func GetUser(w http.ResponseWriter, r *http.Request) {
+	parameters := mux.Vars(r)
+	ID, err := strconv.ParseUint(parameters["id"], 10, 32)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to obtain id for request | " + err.Error()))
+	}
+
+	db, err := database.Connect()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to connect to database: " + err.Error()))
+		return
+	}
+	defer db.Close()
+
+	row, err := db.Query("select * from users where id = ?", ID)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to get all users: " + err.Error()))
+		return
+	}
+	defer row.Close()
+
+	var user user
+
+	if row.Next() {
+		if err = row.Scan(&user.ID, &user.Name, &user.Email); err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			w.Write([]byte("Failed to parse returned object into user struct: " + err.Error()))
+			return
+		}
+	}
+
+	if user.ID == 0 {
+		w.WriteHeader(http.StatusNotFound)
+		w.Write([]byte(fmt.Sprintf("User with ID: %d was not found", ID)))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	if err = json.NewEncoder(w).Encode(user); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to encode user | " + err.Error()))
+		return
+	}
+}
+
+// Updates one user
+func UpdateUser(w http.ResponseWriter, r *http.Request) {
 
 }
 
