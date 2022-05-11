@@ -151,9 +151,56 @@ func GetUser(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// Updates one user
+// Updates one user in the database
 func UpdateUser(w http.ResponseWriter, r *http.Request) {
+	parameters := mux.Vars(r)
 
+	ID, err := strconv.ParseUint(parameters["id"], 10, 32)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to read parameters for request | " + err.Error()))
+		return
+	}
+
+	requestBody, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to read request body | " + err.Error()))
+		return
+	}
+
+	var user user
+
+	if err := json.Unmarshal(requestBody, &user); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to unmarshal body into user struct | " + err.Error()))
+		return
+	}
+
+	db, err := database.Connect()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to connect to database | " + err.Error()))
+		return
+	}
+	defer db.Close()
+
+	statement, err := db.Prepare("update users set name = ?, email = ? where id = ?")
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Error preparing sql statement | " + err.Error()))
+		return
+	}
+	defer statement.Close()
+
+	if _, err := statement.Exec(user.Name, user.Email, ID); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Error executing sql statement | " + err.Error()))
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
+	w.Write([]byte("User successfully updated"))
 }
 
 type user struct {
