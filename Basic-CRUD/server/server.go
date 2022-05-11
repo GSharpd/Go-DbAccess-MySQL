@@ -203,6 +203,43 @@ func UpdateUser(w http.ResponseWriter, r *http.Request) {
 	w.Write([]byte("User successfully updated"))
 }
 
+// Remove one user from the database
+func DeleteUser(w http.ResponseWriter, r *http.Request) {
+	parameters := mux.Vars(r)
+
+	ID, err := strconv.ParseUint(parameters["id"], 10, 32)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to read parameters for request | " + err.Error()))
+		return
+	}
+
+	db, err := database.Connect()
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to connect to database | " + err.Error()))
+		return
+	}
+	defer db.Close()
+
+	statement, err := db.Prepare("delete from users where id = ?")
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Error creating statement | " + err.Error()))
+		return
+	}
+	defer statement.Close()
+
+	if _, err := statement.Exec(ID); err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		w.Write([]byte("Failed to delete user from database | " + err.Error()))
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("User deleted successfully"))
+}
+
 type user struct {
 	ID    uint32 `json:"id"`
 	Name  string `json:"name"`
